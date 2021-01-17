@@ -1,29 +1,92 @@
 const functions = require("firebase-functions");
-const vision = require('@google-cloud/vision');
-const fs = require('fs');
+const vision = require("@google-cloud/vision");
 
 // // Create and Deploy Your First Cloud Functions
 // // https://firebase.google.com/docs/functions/write-firebase-functions
+
+const findFoodHelper = async (request, response) => {
+  const imageBase64 = request.body.image;
+  const client = new vision.ImageAnnotatorClient();
+
+  const [result] = await client.objectLocalization({
+    image: {
+      content: imageBase64,
+    },
+  });
+  // array of objects found in the image
+  const objects = result.localizedObjectAnnotations;
+  const output = [];
+
+  for (let i = 0; i < objects.length; ++i) {
+    if (objects[i].score > 0.85) {
+      output.push(objects[i].name);
+    }
+  }
+
+  functions.logger.info("findFood logs!", {structuredData: true});
+  response.send(200, {
+    objects: output,
+  });
+};
+
+
+const readReceiptHelper = async (request, response) => {
+  const imageBase64 = request.body.image;
+  const client = new vision.ImageAnnotatorClient();
+
+  const [result] = await client.textDetection({
+    image: {
+      content: imageBase64,
+    },
+  });
+  let detections = result.textAnnotations[0].description;
+  detections = detections.replace(/\n/g, ",");
+  const arrayOfDetections = detections.split(",");
+  const output = [];
+
+  arrayOfDetections.forEach((str) => {
+    // if doesn't contain digits, is a grocery,
+    // has not already been added, and is not an empty string
+    if (!/\d/.test(str) &&
+    isGrocery(str) &&
+    !output.includes(str) &&
+    str !== "") {
+      output.push(str);
+    }
+  });
+
+  response.send(200, {
+    objects: output,
+  });
+};
+
+const isGrocery = (str) => {
+  const nonGroceryWords = [
+    "Auth",
+    "AMOUNT",
+    "$",
+    "TOT",
+    "ITEM",
+    "AID",
+    "TVR",
+    "IAD",
+    "TSI",
+    "TAX",
+    "FA",
+  ];
+  for (let i = 0; i < nonGroceryWords.length; ++i) {
+    if (str.includes(nonGroceryWords[i])) {
+      return false;
+    }
+  }
+  return true;
+};
 
 exports.helloWorld = functions.https.onRequest((request, response) => {
   functions.logger.info("Hello logs!", {structuredData: true});
   response.send("Hello from Firebase!");
 });
 
-exports.goodBye = functions.https.onRequest((request, response) => {
-  functions.logger.info("bye logs!", {structuredData: true});
-  response.send("goodBye");
-});
+exports.findFood = functions.https.onRequest(findFoodHelper);
 
-exports.findFood = functions.https.onRequest(async (request, response) => {
-  const client = new vision.ImageAnnotatorClient();
-  const req = {
-    image: {content: fs.readFileSync('./apple.jpg')},
-  }
-
-  const [result] = await client.objectLocalization(req);
-  const objects = result.localizedObjectAnnotations;
-
-  functions.logger.info("findFood logs!", {structuredData: true});
-  response.send(objects);
-});
+exports.readReceipt = functions.https.onRequest(readReceiptHelper);

@@ -4,6 +4,10 @@ const vision = require("@google-cloud/vision");
 // // Create and Deploy Your First Cloud Functions
 // // https://firebase.google.com/docs/functions/write-firebase-functions
 
+/**
+ * HELPERS
+ */
+
 const findFoodHelper = async (request, response) => {
   const imageBase64 = request.body.image;
   const client = new vision.ImageAnnotatorClient();
@@ -18,7 +22,7 @@ const findFoodHelper = async (request, response) => {
   const output = [];
 
   for (let i = 0; i < objects.length; ++i) {
-    if (objects[i].score > 0.85) {
+    if (objects[i].score > 0.50) {
       output.push(objects[i].name);
     }
   }
@@ -81,6 +85,10 @@ const isGrocery = (str) => {
   }
   return true;
 };
+
+/**
+ * Exported Functions
+ */
 
 exports.helloWorld = functions.https.onRequest((request, response) => {
   functions.logger.info("Hello logs!", {structuredData: true});
